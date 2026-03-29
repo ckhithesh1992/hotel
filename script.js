@@ -3,7 +3,7 @@ const rooms = [
     {
         id: 1,
         name: "Deluxe Room (Non-AC)",
-        price: 2500,
+        price: 2000,
         image: "images/Delux_Non_AC_Room.png",
         images: [
             "images/Delux_Non_AC_Room.png",
@@ -21,7 +21,7 @@ const rooms = [
     {
         id: 2,
         name: "Deluxe Room (AC)",
-        price: 3000,
+        price: 2500,
         image: "images/Delux_AC_Room.png",
         images: [
             "images/Delux_AC_Room.png",
@@ -56,7 +56,7 @@ const rooms = [
     {
         id: 4,
         name: "Quade Suite",
-        price: 5000,
+        price: 3500,
         image: "images/Dormitory_Type_I.png",
         images: [
             "images/Dormitory_Type_I.png",
@@ -73,7 +73,7 @@ const rooms = [
     {
         id: 5,
         name: "Seven Wonders",
-        price: "10,000",
+        price: "4,500",
         image: "images/Dormitory_Type_II.png",
         images: [
             "images/Dormitory_Type_II.png",
@@ -90,7 +90,7 @@ const rooms = [
     {
         id: 6,
         name: "Twin Heritage Suite (AC)",
-        price: 5000,
+        price: 3000,
         image: "images/Premium_Suite_Room_02.png",
         images: [
             "images/Premium_Suite_Room_02.png",
