@@ -2,9 +2,6 @@
 
 // ===== Hotel settings: change these in one place =====
 const GST_RATE = 0.05; // 5% GST, already included in the room prices
-const UPI_ID = "ppr.10900.16102024.00907462@cnrb"; // Canara Bank merchant UPI
-const UPI_MERCHANT_CODE = "7399";
-const UPI_NAME = "Hanuman Heritage";
 const HOTEL_PHONE = "8792564056";
 // Google Apps Script web app that writes bookings to the "Hanuman Heritage Website Bookings" sheet
 const BOOKINGS_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxR43drfoiqrBjnC-xpoSgcC7wiRX0eh2mwkFbyp0p8esa15Tar8PeXc1TEHl9q8QaZhA/exec';
@@ -13,7 +10,7 @@ const BOOKINGS_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxR43drfoiqr
 const POLICIES = [
     { title: 'Check-in and check-out', text: 'Check-in from 12:00 noon, check-out by 11:00 am. Ask us on WhatsApp if you need an early check-in or late check-out.' },
     { title: 'ID at check-in', text: 'Please carry a government photo ID (Aadhaar, driving licence, passport or voter ID) for every adult. Foreign guests need a passport and visa.' },
-    { title: 'When your booking is confirmed', text: 'Paying online confirms your booking straight away. If you pay by UPI instead, your rooms are held for 3 hours and the booking is confirmed once we receive the payment and reply on WhatsApp.' },
+    { title: 'When your booking is confirmed', text: 'Pay online through Razorpay (UPI, cards, net banking or wallets) and your booking is confirmed straight away. Rooms are held for 3 hours while you pay.' },
     { title: 'Cancellations', text: 'Online bookings are non-refundable. You can change your dates once, if rooms are available, by messaging us at least 24 hours before check-in. <a href="refund-policy.html">Read the full policy</a>.' },
     { title: 'GST', text: 'Room prices are per room per night and include 5% GST. There is nothing extra to pay.' },
     { title: 'Groups and events', text: 'Booking several rooms or the event hall? Message us and we will plan it with you.' }
@@ -454,8 +451,8 @@ function showCart() {
 }
 
 // ===== Reserve =====
-// The guest submits a booking request; it is recorded as "Pending Payment"
-// and the hotel confirms it once the UPI payment is received.
+// The guest reserves; the booking is recorded as "Pending Payment" and becomes
+// Confirmed as soon as the Razorpay payment succeeds.
 async function proceedToBook() {
     const err = document.getElementById('formError');
     err.textContent = '';
@@ -520,15 +517,17 @@ async function proceedToBook() {
         renderCart();
         return;
     }
-    if (res && res.success) {
-        booking.id = res.bookingId || booking.id;
-        if (typeof res.total === 'number') booking.total = res.total;
-        booking.orderId = res.orderId || null;
-        booking.keyId = res.keyId || null;
-    } else {
-        // Server not reachable: save the old way so the booking is not lost; guest pays by UPI.
-        await saveToGoogleSheets(booking);
+    if (!res || !res.success) {
+        // Booking server not reachable: nothing was saved, so let the guest try again.
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-lock" aria-hidden="true"></i> Reserve &amp; pay';
+        err.textContent = (res && res.error) || 'We could not reach our booking system. Check your internet connection and try again, or call us on +91 ' + HOTEL_PHONE + '.';
+        return;
     }
+    booking.id = res.bookingId || booking.id;
+    if (typeof res.total === 'number') booking.total = res.total;
+    booking.orderId = res.orderId || null;
+    booking.keyId = res.keyId || null;
 
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-lock" aria-hidden="true"></i> Reserve &amp; pay';
@@ -579,117 +578,39 @@ function createOrder(booking) {
     }, 20000);
 }
 
-// Fallback: save the booking without reading a reply
-async function saveToGoogleSheets(booking) {
-    if (!BOOKINGS_SHEET_URL) return;
-
-    const data = {
-        bookingId: booking.id,
-        bookingDate: booking.bookingDate,
-        guestName: booking.guestName,
-        guestPhone: booking.guestPhone,
-        guestEmail: booking.customerEmail,
-        checkIn: booking.checkIn,
-        checkOut: booking.checkOut,
-        adults: booking.adults,
-        children: booking.children,
-        nights: booking.nights,
-        roomName: booking.items.map(i => `${i.qty} × ${i.roomName}`).join('; '),
-        subtotal: booking.subtotal,
-        gst: booking.tax,
-        total: booking.total,
-        status: booking.status
-    };
-
-    try {
-        // text/plain keeps this a "simple" request so Apps Script accepts it without a CORS preflight
-        // Never keep the guest waiting more than 6 seconds on a slow connection
-        await Promise.race([
-            fetch(BOOKINGS_SHEET_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                keepalive: true,
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(data)
-            }),
-            new Promise(resolve => setTimeout(resolve, 6000))
-        ]);
-    } catch (error) {
-        console.error('Error saving booking:', error);
-    }
-}
-
 // ===== Payment =====
 let currentBooking = null;
-
-function upiQuery(booking) {
-    // Keep '@' unencoded and use %20 for spaces: some UPI apps reject '%40' or '+'
-    return `pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&mc=${UPI_MERCHANT_CODE}` +
-        `&am=${booking.total.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Booking ' + booking.id)}`;
-}
-
-function upiLinkFor(booking) {
-    return `upi://pay?${upiQuery(booking)}`;
-}
-
-// Android opens the exact app by package name; iPhone uses each app's own link.
-// Google Pay and Paytm are left out: they refused payments started from the website
-// to this Canara merchant UPI ID (tested 19 Nov 2026). PhonePe and BHIM work.
-const UPI_APPS = [
-    { id: 'phonepe', name: 'PhonePe', android: 'com.phonepe.app', ios: 'phonepe://pay' },
-    { id: 'bhim', name: 'BHIM', android: 'in.org.npci.upiapp', ios: 'bhim://upi/pay' }
-];
-
-function upiAppLink(app, booking) {
-    const q = upiQuery(booking);
-    if (/Android/i.test(navigator.userAgent)) {
-        return `intent://pay?${q}#Intent;scheme=upi;package=${app.android};end`;
-    }
-    return `${app.ios}?${q}`;
-}
-
-function renderUpiAppButtons(booking) {
-    const box = document.getElementById('upiAppButtons');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const qrHeading = document.getElementById('qrHeading');
-    if (!isMobile) {
-        box.hidden = true;
-        qrHeading.textContent = 'Scan with any UPI app on your phone';
-        return;
-    }
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    box.innerHTML = `<h3>Pay ₹${formatINR(booking.total)} with your UPI app</h3>
-        <div class="upi-apps">
-            ${UPI_APPS.map(app => `<a class="upi-app-btn upi-${app.id}" href="${upiAppLink(app, booking)}">${app.name}</a>`).join('')}
-            ${isAndroid ? `<a class="upi-app-btn upi-other" href="${upiLinkFor(booking)}">Other UPI app</a>` : ''}
-        </div>`;
-    box.hidden = false;
-    qrHeading.textContent = 'Or scan from another phone';
-}
 
 function showPayment(booking) {
     currentBooking = booking;
     document.getElementById('payDone').hidden = true;
     document.getElementById('payPending').hidden = false;
-    const online = document.getElementById('payOnline');
-    if (booking.orderId && booking.keyId) {
-        online.hidden = false;
-        document.getElementById('payOnlineAmount').textContent = `₹${formatINR(booking.total)}`;
-        document.getElementById('payOnlineMsg').textContent = '';
-        loadCheckout();
-    } else {
-        online.hidden = true;
-    }
     document.getElementById('payBookingId').textContent = booking.id;
     document.getElementById('payAmount').textContent = `₹${formatINR(booking.total)}`;
-    document.getElementById('payUpiId').textContent = UPI_ID;
-    renderUpiAppButtons(booking);
-
-    const msg = encodeURIComponent(
-        `Hello Hanuman Heritage, I have paid ₹${formatINR(booking.total)} for booking ${booking.id} (${booking.guestName}, ${formatDate(booking.checkIn)} to ${formatDate(booking.checkOut)}). Please confirm my booking.`
-    );
-    document.getElementById('whatsappConfirmBtn').href = `https://wa.me/91${HOTEL_PHONE}?text=${msg}`;
+    document.getElementById('payStay').textContent =
+        `${booking.items.map(i => `${i.qty} × ${i.roomName}`).join(', ')} · ${formatDate(booking.checkIn)} to ${formatDate(booking.checkOut)}, ${booking.nights} night${booking.nights > 1 ? 's' : ''}`;
+    const canPay = !!(booking.orderId && booking.keyId);
+    document.getElementById('payOnline').hidden = !canPay;
+    document.getElementById('payUnavailable').hidden = canPay;
+    if (canPay) {
+        document.getElementById('payOnlineAmount').textContent = `₹${formatINR(booking.total)}`;
+        document.getElementById('payOnlineMsg').textContent = '';
+        setPayBusy(false);
+        loadCheckout().catch(() => {}); // load early; payOnline() reports any failure
+    } else {
+        const msg = encodeURIComponent(`Hello Hanuman Heritage, online payment did not open for booking ${booking.id} (${booking.guestName}, ${formatDate(booking.checkIn)} to ${formatDate(booking.checkOut)}, ₹${formatINR(booking.total)}). Please send me a payment link.`);
+        document.getElementById('payHelpWa').href = `https://wa.me/91${HOTEL_PHONE}?text=${msg}`;
+    }
     openSheet('paymentModal');
+}
+
+function setPayBusy(busy, label) {
+    const btn = document.getElementById('payOnlineBtn');
+    btn.disabled = busy;
+    btn.classList.toggle('is-busy', busy);
+    document.getElementById('payBtnLabel').innerHTML = busy
+        ? label
+        : `Pay <span id="payOnlineAmount">₹${formatINR(currentBooking.total)}</span> securely`;
 }
 
 // ===== Razorpay checkout =====
@@ -712,10 +633,12 @@ async function payOnline() {
     const msg = document.getElementById('payOnlineMsg');
     const btn = document.getElementById('payOnlineBtn');
     msg.textContent = '';
+    setPayBusy(true, 'Opening secure payment…');
     try {
         await loadCheckout();
     } catch (e) {
-        msg.textContent = 'Online payment could not load. Check your internet connection, or pay by UPI below.';
+        setPayBusy(false);
+        msg.textContent = 'Secure payment could not load. Check your internet connection and try again.';
         return;
     }
     const rzp = new Razorpay({
@@ -729,10 +652,10 @@ async function payOnline() {
         notes: { booking_id: b.id },
         theme: { color: '#1E4535' },
         handler: async (resp) => {
-            btn.disabled = true;
-            msg.textContent = 'Payment received. Confirming your booking…';
+            setPayBusy(true, 'Confirming your booking…');
+            msg.textContent = '';
             const v = await apiPost(Object.assign({ action: 'verifyPayment' }, resp), 30000);
-            btn.disabled = false;
+            setPayBusy(false);
             if (v && v.success) {
                 showPaid(b, resp.razorpay_payment_id);
             } else {
@@ -740,13 +663,15 @@ async function payOnline() {
             }
         },
         modal: {
-            ondismiss: () => { msg.textContent = 'Payment not completed. You can try again, or pay by UPI below.'; }
+            ondismiss: () => { setPayBusy(false); msg.textContent = 'Payment not completed. Your rooms are still held, so you can try again.'; }
         }
     });
     rzp.on('payment.failed', (r) => {
+        setPayBusy(false);
         msg.textContent = `Payment failed: ${(r.error && r.error.description) || 'please try again'}.`;
     });
     rzp.open();
+    setPayBusy(false);
 }
 
 function showPaid(b, paymentId) {
@@ -790,7 +715,7 @@ function printBill() {
             <tr><td colspan="3" class="r">GST (${GST_RATE * 100}%, included)</td><td class="r">₹${formatINR(b.tax)}</td></tr>
             <tr class="total"><td colspan="3" class="r">Total</td><td class="r">₹${formatINR(b.total)}</td></tr>
         </table>
-        <p>${b.paymentId ? `Paid online. Payment ID: ${b.paymentId}` : `Pay to UPI ID ${UPI_ID}. Your booking is confirmed once we receive the payment.`}</p>
+        <p>${b.paymentId ? `Paid online. Payment ID: ${b.paymentId}` : 'Not paid yet. Your booking is confirmed once the online payment is complete.'}</p>
         </body></html>`);
     w.document.close();
     w.print();

@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hanuman Heritage, Chikkamagaluru | Hotel rooms on Jyothinagar Main Road</title>
-    <meta name="description" content="Book AC and non-AC rooms, twin rooms and family rooms for 4 to 8 guests at Hanuman Heritage, Jyothinagar Main Road, Chikkamagaluru. Pay by UPI, confirm on WhatsApp. Call +91 87925 64056.">
+    <meta name="description" content="Book AC and non-AC rooms, twin rooms and family rooms for 4 to 8 guests at Hanuman Heritage, Jyothinagar Main Road, Chikkamagaluru. Pay securely online. Call +91 87925 64056.">
     <link rel="canonical" href="https://hanumanheritage.com/">
     <meta name="theme-color" content="#1E4535">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Hanuman Heritage">
     <meta property="og:title" content="Hanuman Heritage – hotel in Chikkamagaluru">
-    <meta property="og:description" content="Rooms for couples, friends and families on Jyothinagar Main Road, Chikkamagaluru. Book online and pay by UPI.">
+    <meta property="og:description" content="Rooms for couples, friends and families on Jyothinagar Main Road, Chikkamagaluru. Book online and pay securely.">
     <meta property="og:image" content="https://hanumanheritage.com/images/web/Entrance.webp">
     <meta property="og:url" content="https://hanumanheritage.com/">
     <meta name="twitter:card" content="summary_large_image">
@@ -110,7 +110,7 @@
             <ul>
                 <li><i class="fas fa-location-dot" aria-hidden="true"></i><span>Jyothinagar Main Road, next to Abharan Jewellers</span></li>
                 <li><i class="fas fa-indian-rupee-sign" aria-hidden="true"></i><span>Rooms from ₹2,000 a night, GST included</span></li>
-                <li><i class="fas fa-mobile-screen" aria-hidden="true"></i><span>Pay by UPI, confirm on WhatsApp</span></li>
+                <li><i class="fas fa-mobile-screen" aria-hidden="true"></i><span>Pay securely online, confirmed instantly</span></li>
                 <li><i class="fas fa-elevator" aria-hidden="true"></i><span>Lift, WiFi and TV in every room</span></li>
             </ul>
         </section>
@@ -261,26 +261,27 @@
             </div>
             <div class="sheet-body pay-body">
                 <div id="payPending">
-                    <p class="pay-note">Your rooms are held. Booking ID <strong id="payBookingId"></strong></p>
-                    <p class="pay-amount">Amount to pay <strong id="payAmount"></strong></p>
+                    <div class="pay-summary">
+                        <p class="pay-summary-label">Total to pay, GST included</p>
+                        <p class="pay-total" id="payAmount"></p>
+                        <p class="pay-summary-meta" id="payStay"></p>
+                        <p class="pay-summary-meta">Booking ID <strong id="payBookingId"></strong></p>
+                    </div>
 
-                    <div class="pay-online" id="payOnline" hidden>
-                        <button type="button" class="btn btn-primary" id="payOnlineBtn" onclick="payOnline()"><i class="fas fa-lock" aria-hidden="true"></i> Pay <span id="payOnlineAmount"></span> online</button>
-                        <p class="pay-note">Cards, UPI, net banking and wallets, secured by Razorpay. Your booking is confirmed straight away.</p>
+                    <div class="pay-online" id="payOnline">
+                        <button type="button" class="pay-btn" id="payOnlineBtn" onclick="payOnline()">
+                            <span class="pay-btn-main"><i class="fas fa-lock" aria-hidden="true"></i> <span id="payBtnLabel">Pay <span id="payOnlineAmount"></span> securely</span></span>
+                            <span class="pay-btn-sub">UPI, cards, net banking or wallet</span>
+                        </button>
                         <p class="pay-msg" id="payOnlineMsg" role="status" aria-live="polite"></p>
-                        <p class="pay-or">Or pay by UPI directly</p>
+                        <p class="pay-secure"><i class="fas fa-shield-halved" aria-hidden="true"></i> Payments are processed by Razorpay. We never see your card or bank details.</p>
+                        <p class="pay-note">Your rooms are held for 3 hours. Paying confirms the booking straight away.</p>
                     </div>
 
-                    <div id="upiAppButtons" class="upi-app-buttons" hidden></div>
-                    <div class="qr-code">
-                        <h3 id="qrHeading">Scan with any UPI app</h3>
-                        <p class="pay-note">Enter the amount above when your UPI app asks for it.</p>
-                        <img src="images/UPI.png" alt="UPI QR code for Hanuman Heritage" width="220" height="220">
-                        <p class="upi-id">UPI ID <strong id="payUpiId"></strong></p>
+                    <div class="pay-unavailable" id="payUnavailable" hidden>
+                        <p><strong>Online payment couldn't start.</strong> Your rooms are held for 3 hours. Message us on WhatsApp with your booking ID and we'll send you a payment link.</p>
+                        <a id="payHelpWa" class="btn btn-wa" href="#" target="_blank" rel="noopener"><i class="fab fa-whatsapp" aria-hidden="true"></i> Message us on WhatsApp</a>
                     </div>
-                    <p class="pay-note">If you pay by UPI, add your booking ID in the payment note and message us so we can confirm your booking.</p>
-                    <a id="whatsappConfirmBtn" class="btn btn-wa" href="#" target="_blank" rel="noopener"><i class="fab fa-whatsapp" aria-hidden="true"></i> I've paid by UPI – confirm on WhatsApp</a>
-                    <button type="button" class="btn btn-ghost" onclick="printBill()"><i class="fas fa-print" aria-hidden="true"></i> Print booking slip</button>
                 </div>
 
                 <div id="payDone" class="pay-done" hidden>
