@@ -14,7 +14,7 @@ const POLICIES = [
     { title: 'Check-in and check-out', text: 'Check-in from 12:00 noon, check-out by 11:00 am. Ask us on WhatsApp if you need an early check-in or late check-out.' },
     { title: 'ID at check-in', text: 'Please carry a government photo ID (Aadhaar, driving licence, passport or voter ID) for every adult. Foreign guests need a passport and visa.' },
     { title: 'When your booking is confirmed', text: 'Your rooms are held when you reserve online. The booking is confirmed once we receive your UPI payment and reply on WhatsApp.' },
-    { title: 'Changes and cancellations', text: 'To change dates or cancel, call or WhatsApp us with your booking ID as early as possible.' },
+    { title: 'Cancellations', text: 'Online bookings are non-refundable. You can change your dates once, if rooms are available, by messaging us at least 24 hours before check-in. <a href="refund-policy.html">Read the full policy</a>.' },
     { title: 'GST', text: 'Room prices shown are per room per night. 5% GST is added to the total.' },
     { title: 'Groups and events', text: 'Booking several rooms or the event hall? Message us and we will plan it with you.' }
 ];
@@ -531,10 +531,10 @@ function upiLinkFor(booking) {
 }
 
 // Android opens the exact app by package name; iPhone uses each app's own link.
+// Google Pay and Paytm are left out: they refused payments started from the website
+// to this Canara merchant UPI ID (tested 19 Nov 2026). PhonePe and BHIM work.
 const UPI_APPS = [
     { id: 'phonepe', name: 'PhonePe', android: 'com.phonepe.app', ios: 'phonepe://pay' },
-    { id: 'gpay', name: 'Google Pay', android: 'com.google.android.apps.nbu.paisa.user', ios: 'tez://upi/pay' },
-    { id: 'paytm', name: 'Paytm', android: 'net.one97.paytm', ios: 'paytmmp://upi/pay' },
     { id: 'bhim', name: 'BHIM', android: 'in.org.npci.upiapp', ios: 'bhim://upi/pay' }
 ];
 
