@@ -1,7 +1,7 @@
 /* Hanuman Heritage — booking site script */
 
 // ===== Hotel settings: change these in one place =====
-const GST_RATE = 0.05; // 5% GST on room tariffs
+const GST_RATE = 0.05; // 5% GST, already included in the room prices
 const UPI_ID = "ppr.10900.16102024.00907462@cnrb"; // Canara Bank merchant UPI
 const UPI_MERCHANT_CODE = "7399";
 const UPI_NAME = "Hanuman Heritage";
@@ -13,71 +13,67 @@ const BOOKINGS_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxR43drfoiqr
 const POLICIES = [
     { title: 'Check-in and check-out', text: 'Check-in from 12:00 noon, check-out by 11:00 am. Ask us on WhatsApp if you need an early check-in or late check-out.' },
     { title: 'ID at check-in', text: 'Please carry a government photo ID (Aadhaar, driving licence, passport or voter ID) for every adult. Foreign guests need a passport and visa.' },
-    { title: 'When your booking is confirmed', text: 'Your rooms are held when you reserve online. The booking is confirmed once we receive your UPI payment and reply on WhatsApp.' },
+    { title: 'When your booking is confirmed', text: 'Paying online confirms your booking straight away. If you pay by UPI instead, your rooms are held for 3 hours and the booking is confirmed once we receive the payment and reply on WhatsApp.' },
     { title: 'Cancellations', text: 'Online bookings are non-refundable. You can change your dates once, if rooms are available, by messaging us at least 24 hours before check-in. <a href="refund-policy.html">Read the full policy</a>.' },
-    { title: 'GST', text: 'Room prices shown are per room per night. 5% GST is added to the total.' },
+    { title: 'GST', text: 'Room prices are per room per night and include 5% GST. There is nothing extra to pay.' },
     { title: 'Groups and events', text: 'Booking several rooms or the event hall? Message us and we will plan it with you.' }
 ];
 
 // ===== Rooms =====
-// price: per room per night (before GST). guests: maximum guests per room.
+// price: per room per night, GST included. guests: maximum guests per room.
+// stock: how many rooms of this type the hotel has (26 in all). The website also asks the
+// booking server how many are free for the chosen dates, so rooms sold on Booking.com or
+// to walk-in guests are not sold twice.
 const rooms = [
     {
-        id: 1, name: 'Deluxe Room (Non-AC)', price: 2000, guests: 2,
-        bed: 'Double bed', size: '250 sq ft', stock: 8,
+        id: 1, name: 'Non-AC Room', price: 2000, guests: 2,
+        bed: 'Double bed', size: '250 sq ft', stock: 12,
         photos: ['Delux_Non_AC_Room', 'Delux_Non_AC', 'Bathroom_01', 'Passage_02'],
         description: 'A comfortable double room with a ceiling fan. A good choice for couples and solo travellers.',
         features: ['Double bed', 'Fan', 'TV', 'WiFi', 'Attached bathroom']
     },
     {
-        id: 2, name: 'Deluxe Room (AC)', price: 2500, guests: 2,
-        bed: 'Double bed', size: '250 sq ft', stock: 6,
-        photos: ['Delux_AC_Room', 'Bathroom_01', 'Hotel_Lobby', 'Passage_02'],
-        description: 'The same double room with air conditioning, for warmer days and a quieter night.',
+        id: 2, name: 'AC Room', price: 2500, guests: 2,
+        bed: 'Double bed', size: '250 sq ft', stock: 10,
+        photos: ['Delux_AC_Room', 'Premium_Suite_Room_02', 'Premium_Suite_Room_01', 'Bathroom_01'],
+        description: 'A double room with air conditioning, for warmer days and a quieter night.',
         features: ['Double bed', 'Air conditioning', 'TV', 'WiFi', 'Attached bathroom']
     },
     {
-        id: 3, name: 'Twin Sharing Room', price: 2500, guests: 2,
-        bed: 'Two single beds', size: '250 sq ft', stock: 8,
+        id: 3, name: 'Twin Bedded AC Room', price: 2500, guests: 2,
+        bed: 'Two single beds', size: '250 sq ft', stock: 2,
         photos: ['Twin_Sharing_Beds', 'Bathroom_02', 'Passage_01'],
-        description: 'Two separate beds, for friends or colleagues travelling together.',
+        description: 'Two separate beds with air conditioning, for friends or colleagues travelling together.',
         features: ['Two single beds', 'Air conditioning', 'TV', 'WiFi', 'Attached bathroom']
     },
     {
-        id: 6, name: 'Twin Heritage Suite (AC)', price: 3000, guests: 2,
-        bed: 'King size bed', size: '280 sq ft', stock: 2,
-        photos: ['Premium_Suite_Room_02', 'Premium_Suite_Room_01', 'Heritage_Suite', 'Bathroom_01'],
-        description: 'Our largest room for two, with a king size bed and extra space to relax.',
-        features: ['King size bed', 'Air conditioning', 'TV', 'WiFi', 'Attached bathroom']
-    },
-    {
-        id: 4, name: 'Quade Suite', price: 3500, guests: 4,
+        id: 4, name: 'Four Bedded Family Room', price: 4000, guests: 4,
         bed: 'Four beds', size: '250 sq ft', stock: 1,
         photos: ['Dormitory_Type_I', 'Bathroom_01', 'Passage_02'],
         description: 'One room with four beds, for a family or a group of four.',
-        features: ['Four beds', 'Air conditioning', 'TV', 'WiFi', 'Bathroom']
+        features: ['Four beds', 'TV', 'WiFi', 'Bathroom']
     },
     {
-        id: 5, name: 'Seven Wonders', price: 4500, guests: 8,
-        bed: 'Multiple beds', size: '450 sq ft', stock: 1,
+        id: 5, name: 'Seven Bedded Family Room', price: 7000, guests: 7,
+        bed: 'Seven beds', size: '450 sq ft', stock: 1,
         photos: ['Dormitory_Type_II', 'Bathroom_01', 'Passage_02'],
-        description: 'A large family room for 6 to 8 guests, so the whole group stays together.',
-        features: ['Beds for 6 to 8', 'Air conditioning', 'TV', 'WiFi', 'Bathroom']
+        description: 'A large family room with seven beds, so the whole group stays together.',
+        features: ['Seven beds', 'TV', 'WiFi', 'Bathroom']
     }
 ];
 
 const GALLERY = [
     ['Entrance', 'The hotel entrance at night'],
     ['Hotel_Lobby', 'Lobby'],
-    ['Premium_Suite_Room_02', 'Twin Heritage Suite'],
+    ['Premium_Suite_Room_02', 'AC Room'],
     ['Recepetion_Desk', 'Reception'],
     ['Dinning_Area', 'Dining area'],
     ['Passage', 'Room corridor'],
-    ['Delux_AC_Room', 'Deluxe Room (AC)'],
+    ['Delux_AC_Room', 'AC Room'],
     ['Event_Hall', 'Event hall'],
     ['Hotel_Frount_View', 'Front of the building'],
     ['Elevator', 'Lift lobby'],
-    ['Dormitory_Type_II', 'Seven Wonders family room'],
+    ['Dormitory_Type_II', 'Seven Bedded Family Room'],
     ['Bathroom_01', 'Bathroom']
 ];
 
@@ -147,10 +143,11 @@ function capacity() {
 }
 
 function totals() {
+    // Prices include GST, so the GST part is worked back out of the total.
     const n = Math.max(1, nights());
-    const subtotal = cartRooms().reduce((s, x) => s + x.room.price * x.qty * n, 0);
-    const gst = Math.round(subtotal * GST_RATE * 100) / 100;
-    return { nights: n, subtotal, gst, total: Math.round((subtotal + gst) * 100) / 100 };
+    const total = cartRooms().reduce((s, x) => s + x.room.price * x.qty * n, 0);
+    const gst = Math.round((total - total / (1 + GST_RATE)) * 100) / 100;
+    return { nights: n, subtotal: Math.round((total - gst) * 100) / 100, gst, total };
 }
 
 let toastTimer;
@@ -254,6 +251,45 @@ function onStayChange() {
     saveState();
     renderRooms();
     renderCart();
+    if (nights() > 0) fetchAvailability();
+}
+
+// ===== Live availability =====
+// Rooms free for the chosen dates, from the booking server. It counts website bookings,
+// Booking.com bookings and walk-in guests entered in the staff dashboard.
+let avail = null;       // { roomId: rooms free } for availKey, or null if not known yet
+let availKey = '';
+
+function freeRooms(room) {
+    if (avail && availKey === stay.checkIn + '|' + stay.checkOut && avail[room.id] != null) {
+        return Math.max(0, Math.min(room.stock, Number(avail[room.id])));
+    }
+    return room.stock;
+}
+
+let availTimer;
+function fetchAvailability() {
+    clearTimeout(availTimer);
+    availTimer = setTimeout(async () => {
+        const key = stay.checkIn + '|' + stay.checkOut;
+        const res = await apiPost({ action: 'availability', checkIn: stay.checkIn, checkOut: stay.checkOut }, 10000);
+        if (!res || !res.success || key !== stay.checkIn + '|' + stay.checkOut) return;
+        avail = res.available;
+        availKey = key;
+        // Take out rooms that were sold while the guest was choosing
+        let trimmed = false;
+        rooms.forEach(r => {
+            if (cart[r.id] > freeRooms(r)) {
+                trimmed = true;
+                cart[r.id] = freeRooms(r);
+                if (!cart[r.id]) delete cart[r.id];
+            }
+        });
+        saveState();
+        renderRooms();
+        renderCart();
+        if (trimmed) toast('Some rooms you picked are no longer free for these dates, so we updated your selection.');
+    }, 250);
 }
 
 // ===== Rooms =====
@@ -263,15 +299,17 @@ function renderRooms() {
     const g = totalGuests();
     const intro = document.getElementById('roomsIntro');
     intro.textContent = n > 0
-        ? `Prices for ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}, ${n} night${n > 1 ? 's' : ''}. 5% GST is added at checkout.`
-        : 'Prices are per room per night. 5% GST is added at checkout.';
+        ? `Prices for ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}, ${n} night${n > 1 ? 's' : ''}, GST included.`
+        : 'Prices are per room per night, GST included.';
 
     list.innerHTML = rooms.map(room => {
         const qty = cart[room.id] || 0;
         const stayPrice = n > 0 ? `<span class="price-stay">₹${formatINR(room.price * n)} for ${n} night${n > 1 ? 's' : ''}</span>` : '';
+        const free = freeRooms(room);
         const fit = room.guests >= g || g === 0
-            ? `Sleeps ${room.guests === 8 ? '6 to 8' : room.guests}`
-            : `Sleeps ${room.guests === 8 ? '6 to 8' : room.guests}. Add ${Math.ceil(g / room.guests)} rooms for ${g} guests`;
+            ? `Sleeps ${room.guests}`
+            : `Sleeps ${room.guests}. Add ${Math.ceil(g / room.guests)} rooms for ${g} guests`;
+        const left = free > 0 && free <= 3 && n > 0 ? `<p class="left-note">Only ${free} left for your dates</p>` : '';
         return `
         <article class="room" id="room-${room.id}">
             <button type="button" class="room-photo" data-room-photos="${room.id}" aria-label="See ${room.photos.length} photos of the ${escapeHTML(room.name)}">
@@ -297,14 +335,20 @@ function renderRooms() {
                     <div class="qty" role="group" aria-label="Number of ${escapeHTML(room.name)} rooms">
                         <button type="button" data-qty="${room.id}" data-step="-1" aria-label="Remove one room">−</button>
                         <output aria-live="polite">${qty}</output>
-                        <button type="button" data-qty="${room.id}" data-step="1" aria-label="Add one room" ${qty >= room.stock ? 'disabled' : ''}>+</button>
+                        <button type="button" data-qty="${room.id}" data-step="1" aria-label="Add one room" ${qty >= free ? 'disabled' : ''}>+</button>
                     </div>
                     <p class="fit-note">${qty} room${qty > 1 ? 's' : ''} selected</p>
+                </div>` : `
+                ${free === 0 ? `
+                <div>
+                    <button type="button" class="btn btn-primary" disabled>Sold out</button>
+                    <p class="fit-note">No ${escapeHTML(room.name)} free for these dates. Try other dates or another room.</p>
                 </div>` : `
                 <div>
                     <button type="button" class="btn btn-primary" data-add="${room.id}">Select room</button>
                     <p class="fit-note">${fit}</p>
-                </div>`}
+                    ${left}
+                </div>`}`}
             </div>
         </article>`;
     }).join('');
@@ -318,7 +362,7 @@ function changeQty(roomId, step) {
         document.getElementById('checkIn').focus();
         return;
     }
-    const q = Math.min(room.stock, Math.max(0, (cart[roomId] || 0) + step));
+    const q = Math.min(freeRooms(room), Math.max(0, (cart[roomId] || 0) + step));
     cart[roomId] = q;
     if (q === 0) delete cart[roomId];
     saveState();
@@ -465,6 +509,17 @@ async function proceedToBook() {
 
     // Save the booking and create a Razorpay order (price is worked out on the server).
     const res = await createOrder(booking);
+    if (res && !res.success && res.soldOut) {
+        // Someone else booked the last room while this guest was paying attention elsewhere
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-lock" aria-hidden="true"></i> Reserve &amp; pay';
+        err.textContent = res.error || 'Some of these rooms were just booked. Choose again.';
+        avail = res.available || avail;
+        availKey = stay.checkIn + '|' + stay.checkOut;
+        renderRooms();
+        renderCart();
+        return;
+    }
     if (res && res.success) {
         booking.id = res.bookingId || booking.id;
         if (typeof res.total === 'number') booking.total = res.total;
@@ -731,8 +786,8 @@ function printBill() {
         <table>
             <tr><th>Room</th><th class="r">Rooms</th><th class="r">Price/night</th><th class="r">Amount</th></tr>
             ${b.items.map(i => `<tr><td>${i.roomName}</td><td class="r">${i.qty}</td><td class="r">₹${formatINR(i.price)}</td><td class="r">₹${formatINR(i.total)}</td></tr>`).join('')}
-            <tr><td colspan="3" class="r">Subtotal</td><td class="r">₹${formatINR(b.subtotal)}</td></tr>
-            <tr><td colspan="3" class="r">GST (${GST_RATE * 100}%)</td><td class="r">₹${formatINR(b.tax)}</td></tr>
+            <tr><td colspan="3" class="r">Room charges before GST</td><td class="r">₹${formatINR(b.subtotal)}</td></tr>
+            <tr><td colspan="3" class="r">GST (${GST_RATE * 100}%, included)</td><td class="r">₹${formatINR(b.tax)}</td></tr>
             <tr class="total"><td colspan="3" class="r">Total</td><td class="r">₹${formatINR(b.total)}</td></tr>
         </table>
         <p>${b.paymentId ? `Paid online. Payment ID: ${b.paymentId}` : `Pay to UPI ID ${UPI_ID}. Your booking is confirmed once we receive the payment.`}</p>
