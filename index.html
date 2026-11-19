@@ -9,60 +9,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
-<!-- UPI QR Modal -->
-<div id="upiQRModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="document.getElementById('upiQRModal').style.display='none'">&times;</span>
-    <h3>Scan to Pay with UPI</h3>
-
-    <!-- QR Code Image -->
-    <img src="images/UPI.png" id="upiQRImage" style="width:250px; border:1px solid #ddd; border-radius:10px; padding:5px;">
-
-    <p style="margin-top:10px; font-size:18px;">
-      Total Amount: <strong><span id="qrAmount"></span></strong>
-    </p>
-  </div>
-</div>
-
-<!-- UPI Payment Script -->
-<script>
-function showUPIQR(totalAmount) {
-    document.getElementById("qrAmount").textContent = "₹" + totalAmount;
-    document.getElementById("upiQRModal").style.display = "block";
-}
-
-function payWithUPI() {
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.18;
-    const totalAmount = (subtotal + tax).toFixed(2);
-
-    const upiID = "8277373641@upi";
-    const upiName = "Hanuman Heritage";
-
-    const upiLink = `upi://pay?pa=${upiID}&pn=${encodeURIComponent(upiName)}&am=${totalAmount}&cu=INR`;
-
-    // Android fallback intent
-    const intentLink = `intent://pay?pa=${upiID}&pn=${encodeURIComponent(upiName)}&am=${totalAmount}&cu=INR#Intent;scheme=upi;end;`;
-
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-        // Attempt direct UPI app launch
-        window.location.href = upiLink;
-
-        // Fallback if blocked
-        setTimeout(() => {
-            window.location.href = intentLink;
-        }, 1500);
-
-    } else {
-        // Desktop fallback - show QR modal
-        showUPIQR(totalAmount);
-        alert("Use your mobile UPI app or scan the QR code to complete the payment.");
-    }
-}
-</script>
-
 <body>
 
     <!-- Navigation Bar -->
@@ -294,7 +240,6 @@ function payWithUPI() {
                         <label><i class="fas fa-moon"></i> Nights</label>
                         <input type="number" id="nights" name="nights" min="1" value="1" readonly>
                     </div>
-					<input type="email" id="customerEmail" placeholder="Enter your email" required>
                     <button type="submit" class="btn-book-now">
                         <i class="fas fa-search"></i> Search Rooms
                     </button>
@@ -567,7 +512,7 @@ function payWithUPI() {
                         <span id="subtotal">₹0</span>
                     </div>
                     <div class="summary-row">
-                        <span>Tax (18%):</span>
+                        <span>GST (5%):</span>
                         <span id="tax">₹0</span>
                     </div>
                     <div class="summary-row total">
@@ -575,12 +520,16 @@ function payWithUPI() {
                         <span id="total">₹0</span>
                     </div>
                 </div>
+                <div class="guest-details">
+                    <h3>Guest Details</h3>
+                    <input type="text" id="guestName" placeholder="Full name *" autocomplete="name" required>
+                    <input type="tel" id="guestPhone" placeholder="Mobile number *" autocomplete="tel" inputmode="numeric" required>
+                    <input type="email" id="customerEmail" placeholder="Email (optional)" autocomplete="email">
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-clear" onclick="clearCart()">Clear Cart</button>
-                <button class="btn-pay" onclick="showPayment()">Pay Now</button>
-				<button class="btn-pay" onclick="payWithUPI()">Pay with UPI</button>
-                <button class="btn-book" onclick="proceedToBook()">Book Now</button>
+                <button class="btn-book" id="confirmBookingBtn" onclick="proceedToBook()"><i class="fas fa-lock"></i> Reserve &amp; Pay</button>
             </div>
         </div>
     </div>
@@ -589,57 +538,35 @@ function payWithUPI() {
     <div id="paymentModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Payment</h2>
+                <h2>Complete Your Payment</h2>
                 <span class="close">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="payment-options">
+                    <p class="pay-note">Your rooms are reserved. Booking ID: <strong id="payBookingId"></strong></p>
+                    <p class="pay-amount">Amount to pay: <strong id="payAmount"></strong></p>
                     <div class="qr-code">
-                        <h3>Scan QR Code to Pay</h3>
+                        <h3>Scan with any UPI app</h3>
+                        <p class="pay-note">Enter the amount shown above when your UPI app asks for it.</p>
                         <div id="qrCodeContainer">
-                            <img src="images/UPI.png" alt="QR Code">
+                            <img src="images/UPI.png" alt="UPI QR code for Hanuman Heritage">
                         </div>
-                        <p>UPI ID: 8277373641@upi</p>
+                        <p>UPI ID: <strong id="payUpiId"></strong></p>
+                        <a id="openUpiAppBtn" class="btn-pay" href="#" style="display:none;"><i class="fas fa-mobile-alt"></i> Pay with UPI app</a>
                     </div>
+                    <p class="pay-note">Please mention your Booking ID in the payment note. After paying, send us a message so we can confirm your booking.</p>
+                    <a id="whatsappConfirmBtn" class="btn-book" href="#" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> I've paid – confirm on WhatsApp</a>
                 </div>
-                <button class="btn-print" onclick="printBill()">Print Bill</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Admin Panel Button (Fixed) -->
-    <button class="admin-btn" onclick="openAdminPanel()">
-        <i class="fas fa-cog"></i> Admin
-    </button>
-
-    <!-- Admin Panel Modal -->
-    <div id="adminModal" class="modal">
-        <div class="modal-content admin-panel">
-            <div class="modal-header">
-                <h2>Admin Panel</h2>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="admin-tabs">
-                    <button class="tab-btn active" onclick="showTab('bookings')">Manage Bookings</button>
-                    <button class="tab-btn" onclick="showTab('reports')">Monthly Sales Report</button>
-                </div>
-                <div id="bookingsTab" class="tab-content active">
-                    <div id="bookingsList"></div>
-                </div>
-                <div id="reportsTab" class="tab-content">
-                    <div id="salesReport"></div>
-                </div>
+                <button class="btn-print" onclick="printBill()">Print Booking Slip</button>
             </div>
         </div>
     </div>
 
     <footer class="footer">
-        <p>&copy; 2024 Hanuman Heritage. All rights reserved.</p>
+        <p>&copy; 2026 Hanuman Heritage. All rights reserved.</p>
         <p>Jyothinagar Main Road, Next to Abharan Jewelers, Chikkamagaluru, Karnataka 577101</p>
     </footer>
 
-    <script src="https://apis.google.com/js/api.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

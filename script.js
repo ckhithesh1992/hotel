@@ -73,7 +73,7 @@ const rooms = [
     {
         id: 5,
         name: "Seven Wonders",
-        price: "4,500",
+        price: 4500,
         image: "images/Dormitory_Type_II.png",
         images: [
             "images/Dormitory_Type_II.png",
@@ -109,7 +109,6 @@ const rooms = [
 
 // Cart Management
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
-let bookings = JSON.parse(localStorage.getItem('bookings')) || [];
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -119,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupBookingForm();
     setupDateValidation();
     setupModalClose();
-    loadBookings();
     
     // Setup room filters
     const priceFilter = document.getElementById('priceFilter');
@@ -263,7 +261,7 @@ function loadRooms(roomsToDisplay = filteredRooms) {
                         <i class="fas fa-eye"></i> View Details
                     </button>
                 </div>
-                <div class="room-badge">₹${room.price}/night</div>
+                <div class="room-badge">₹${formatINR(room.price)}/night</div>
             </div>
             <div class="room-details">
                 <h3>${room.name}</h3>
@@ -303,7 +301,7 @@ function viewRoomDetails(roomId) {
     
     // Set room details
     document.getElementById('modalRoomName').textContent = room.name;
-    document.getElementById('modalPrice').textContent = `₹${room.price}`;
+    document.getElementById('modalPrice').textContent = `₹${formatINR(room.price)}`;
     document.getElementById('modalCapacity').textContent = `${room.capacity} Guests`;
     document.getElementById('modalBedType').textContent = room.bedType;
     document.getElementById('modalSize').textContent = room.size;
@@ -431,41 +429,66 @@ function setupDateValidation() {
     }
 }
 
+// ===== Booking & payment settings =====
+// Change these in one place if the hotel's details change.
+const GST_RATE = 0.05; // 5% GST on room tariffs
+const UPI_ID = "ppr.10900.16102024.00907462@cnrb"; // Canara Bank merchant UPI
+const UPI_MERCHANT_CODE = "7399";
+const UPI_NAME = "Hanuman Heritage";
+const HOTEL_PHONE = "8792564056";
+// Google Apps Script web-app URL that writes bookings to the Google Sheet
+// (see google-apps-script.js). Leave empty to disable.
+const BOOKINGS_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxR43drfoiqrBjnC-xpoSgcC7wiRX0eh2mwkFbyp0p8esa15Tar8PeXc1TEHl9q8QaZhA/exec';
+
 // Cart Functions
+function nightsBetween(checkIn, checkOut) {
+    const diff = new Date(checkOut) - new Date(checkIn);
+    return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)));
+}
+
 function addToCart(roomId) {
     const checkIn = document.getElementById('checkIn')?.value;
     const checkOut = document.getElementById('checkOut')?.value;
     const adults = parseInt(document.getElementById('adults')?.value || 1);
     const children = parseInt(document.getElementById('children')?.value || 0);
-    const nights = parseInt(document.getElementById('nights')?.value || 1);
-    
+
     if (!checkIn || !checkOut) {
         alert('Please select check-in and check-out dates first!');
         document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
         return;
     }
-    
+    if (new Date(checkOut) <= new Date(checkIn)) {
+        alert('Check-out date must be after the check-in date.');
+        document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+
     const room = rooms.find(r => r.id === roomId);
     if (!room) return;
-    
+
+    const nights = nightsBetween(checkIn, checkOut);
     const cartItem = {
         id: Date.now(),
         roomId: room.id,
         roomName: room.name,
-        price: room.price,
+        price: Number(room.price),
         image: room.image,
         checkIn: checkIn,
         checkOut: checkOut,
         adults: adults,
         children: children,
         nights: nights,
-        total: room.price * nights
+        total: Number(room.price) * nights
     };
-    
+
     cart.push(cartItem);
-    localStorage.setItem('cart', JSON.stringify(cart));
+    saveCart();
     updateCartCount();
     showCart();
+}
+
+function saveCart() {
+    localStorage.setItem('cart', JSON.stringify(cart));
 }
 
 function updateCartCount() {
@@ -478,7 +501,7 @@ function updateCartCount() {
 function showCart() {
     const modal = document.getElementById('cartModal');
     if (!modal) return;
-    
+
     modal.style.display = 'block';
     renderCart();
 }
@@ -486,51 +509,35 @@ function showCart() {
 function renderCart() {
     const cartItems = document.getElementById('cartItems');
     if (!cartItems) return;
-    
+
     if (cart.length === 0) {
         cartItems.innerHTML = '<p style="text-align: center; padding: 2rem;">Your cart is empty</p>';
         updateCartSummary();
         return;
     }
-    
+
     cartItems.innerHTML = cart.map(item => `
         <div class="cart-item">
             <div class="cart-item-details">
                 <h4>${item.roomName}</h4>
                 <p>Check-in: ${formatDate(item.checkIn)} | Check-out: ${formatDate(item.checkOut)}</p>
                 <p>Adults: ${item.adults} | Children: ${item.children} | Nights: ${item.nights}</p>
-                <p><strong>₹${item.total}</strong></p>
+                <p>₹${formatINR(item.price)} × ${item.nights} night(s) = <strong>₹${formatINR(item.total)}</strong></p>
             </div>
             <div class="cart-item-actions">
-                <div class="quantity-control">
-                    <button onclick="updateQuantity(${item.id}, -1)">-</button>
-                    <span>${item.nights}</span>
-                    <button onclick="updateQuantity(${item.id}, 1)">+</button>
-                </div>
                 <button class="remove-item" onclick="removeFromCart(${item.id})">
                     <i class="fas fa-trash"></i> Remove
                 </button>
             </div>
         </div>
     `).join('');
-    
-    updateCartSummary();
-}
 
-function updateQuantity(itemId, change) {
-    const item = cart.find(i => i.id === itemId);
-    if (!item) return;
-    
-    item.nights = Math.max(1, item.nights + change);
-    item.total = item.price * item.nights;
-    
-    localStorage.setItem('cart', JSON.stringify(cart));
-    renderCart();
+    updateCartSummary();
 }
 
 function removeFromCart(itemId) {
     cart = cart.filter(item => item.id !== itemId);
-    localStorage.setItem('cart', JSON.stringify(cart));
+    saveCart();
     updateCartCount();
     renderCart();
 }
@@ -538,123 +545,115 @@ function removeFromCart(itemId) {
 function clearCart() {
     if (confirm('Are you sure you want to clear the cart?')) {
         cart = [];
-        localStorage.setItem('cart', JSON.stringify(cart));
+        saveCart();
         updateCartCount();
         renderCart();
     }
 }
 
+function cartTotals(items = cart) {
+    const subtotal = items.reduce((sum, item) => sum + Number(item.total), 0);
+    const gst = Math.round(subtotal * GST_RATE * 100) / 100;
+    const total = Math.round((subtotal + gst) * 100) / 100;
+    return { subtotal, gst, total };
+}
+
 function updateCartSummary() {
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.18;
-    const total = subtotal + tax;
-    
-    document.getElementById('subtotal').textContent = `₹${subtotal.toFixed(2)}`;
-    document.getElementById('tax').textContent = `₹${tax.toFixed(2)}`;
-    document.getElementById('total').textContent = `₹${total.toFixed(2)}`;
+    const { subtotal, gst, total } = cartTotals();
+    document.getElementById('subtotal').textContent = `₹${formatINR(subtotal)}`;
+    document.getElementById('tax').textContent = `₹${formatINR(gst)}`;
+    document.getElementById('total').textContent = `₹${formatINR(total)}`;
 }
 
 // Booking Functions
-function proceedToBook() {
+// The guest submits a booking request; it is recorded as "Pending Payment"
+// and the hotel confirms it once the UPI payment is received.
+async function proceedToBook() {
     if (cart.length === 0) {
         alert('Your cart is empty!');
         return;
     }
 
-    // Get customer email from input box
-    const customerEmail = document.getElementById('customerEmail')?.value || "";
+    const name = document.getElementById('guestName')?.value.trim() || '';
+    const phone = document.getElementById('guestPhone')?.value.trim() || '';
+    const email = document.getElementById('customerEmail')?.value.trim() || '';
 
-    if (customerEmail === "") {
-        alert("Please enter your email to receive booking confirmation.");
+    if (!name) {
+        alert('Please enter your name.');
+        document.getElementById('guestName')?.focus();
+        return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phone.replace(/[\s-]/g, '').replace(/^(\+91|0)/, ''))) {
+        alert('Please enter a valid 10-digit mobile number.');
+        document.getElementById('guestPhone')?.focus();
+        return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Please enter a valid email address, or leave it blank.');
+        document.getElementById('customerEmail')?.focus();
         return;
     }
 
+    const { subtotal, gst, total } = cartTotals();
     const booking = {
-        id: Date.now(),
+        id: 'HH' + Date.now(),
         bookingDate: new Date().toISOString(),
-        items: [...cart],
-        subtotal: cart.reduce((sum, item) => sum + item.total, 0),
-        tax: cart.reduce((sum, item) => sum + item.total, 0) * 0.18,
-        total: cart.reduce((sum, item) => sum + item.total, 0) * 1.18,
-        status: 'Confirmed',
-        customerEmail: customerEmail  // NEW FIELD for email sending
+        guestName: name,
+        guestPhone: phone,
+        customerEmail: email,
+        items: cart.map(item => ({ ...item })),
+        subtotal: subtotal,
+        tax: gst,
+        total: total,
+        status: 'Pending Payment'
     };
 
-    bookings.push(booking);
-    localStorage.setItem('bookings', JSON.stringify(bookings));
+    const btn = document.getElementById('confirmBookingBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving booking…'; }
 
-    // Send to Google Sheets + Trigger Email Confirmation
-    saveToGoogleSheets(booking);
+    await saveToGoogleSheets(booking);
 
-    alert('Booking confirmed! Your booking ID is: ' + booking.id);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Reserve &amp; Pay'; }
 
     cart = [];
-    localStorage.setItem('cart', JSON.stringify(cart));
+    saveCart();
     updateCartCount();
 
     document.getElementById('cartModal').style.display = 'none';
-    loadBookings();
+    showPayment(booking);
 }
-
-document.addEventListener("DOMContentLoaded", function () {
-  const form = document.getElementById("bookingForm");
-  const status = document.getElementById("bookingStatus");
-
-  if (form) {
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const data = new FormData(form);
-
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: data,
-        headers: { Accept: "application/json" }
-      });
-
-      if (response.ok) {
-        status.textContent = "Your booking request has been submitted successfully. We will contact you shortly!";
-        form.reset();
-      } else {
-        status.style.color = "red";
-        status.textContent = "Oops! Something went wrong. Please try again.";
-      }
-    });
-  }
-});
 
 // Google Sheets Integration
 async function saveToGoogleSheets(booking) {
-    // This is a placeholder for Google Sheets API integration
-    // You'll need to set up Google Sheets API credentials
-    // For now, we'll use a simple fetch to a Google Apps Script web app
-    
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbwgEtvbEq9c0Q_nPQUc3JdTtIYnhbzRLWDgTFeADqYy12GwO8GKymt5BCSVNIO80iAG/exec'; // Replace with your Google Apps Script URL
-    
-    if (scriptURL === 'https://script.google.com/macros/s/AKfycbwgEtvbEq9c0Q_nPQUc3JdTtIYnhbzRLWDgTFeADqYy12GwO8GKymt5BCSVNIO80iAG/exec') {
-        console.log('Google Sheets integration not configured. Booking saved locally.');
+    if (!BOOKINGS_SHEET_URL) {
+        console.log('Google Sheets integration not configured.');
         return;
     }
-    
+
+    const data = {
+        bookingId: booking.id,
+        bookingDate: booking.bookingDate,
+        guestName: booking.guestName,
+        guestPhone: booking.guestPhone,
+        guestEmail: booking.customerEmail,
+        checkIn: booking.items[0].checkIn,
+        checkOut: booking.items[0].checkOut,
+        adults: booking.items.reduce((s, i) => s + i.adults, 0),
+        children: booking.items.reduce((s, i) => s + i.children, 0),
+        nights: booking.items[0].nights,
+        roomName: booking.items.map(i => `${i.roomName} (${formatDate(i.checkIn)} – ${formatDate(i.checkOut)}, ${i.nights}N)`).join('; '),
+        subtotal: booking.subtotal,
+        gst: booking.tax,
+        total: booking.total,
+        status: booking.status
+    };
+
     try {
-        const data = {
-            bookingId: booking.id,
-            bookingDate: booking.bookingDate,
-            checkIn: booking.items[0].checkIn,
-            checkOut: booking.items[0].checkOut,
-            adults: booking.items[0].adults,
-            children: booking.items[0].children,
-            nights: booking.items[0].nights,
-            roomName: booking.items[0].roomName,
-            total: booking.total,
-            status: booking.status
-        };
-        
-        await fetch(scriptURL, {
+        // text/plain keeps this a "simple" request so Apps Script accepts it without CORS preflight
+        await fetch(BOOKINGS_SHEET_URL, {
             method: 'POST',
             mode: 'no-cors',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(data)
         });
     } catch (error) {
@@ -663,26 +662,45 @@ async function saveToGoogleSheets(booking) {
 }
 
 // Payment Functions
-function showPayment() {
-    if (cart.length === 0) {
-        alert('Your cart is empty!');
-        return;
+let currentBooking = null;
+
+function upiLinkFor(booking) {
+    // Keep '@' unencoded and use %20 for spaces — some UPI apps reject '%40' or '+'
+    return `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&mc=${UPI_MERCHANT_CODE}` +
+        `&am=${booking.total.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Booking ' + booking.id)}`;
+}
+
+function showPayment(booking) {
+    currentBooking = booking;
+    document.getElementById('payBookingId').textContent = booking.id;
+    document.getElementById('payAmount').textContent = `₹${formatINR(booking.total)}`;
+    document.getElementById('payUpiId').textContent = UPI_ID;
+
+    const upiBtn = document.getElementById('openUpiAppBtn');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (upiBtn) {
+        upiBtn.href = upiLinkFor(booking);
+        upiBtn.style.display = isMobile ? 'inline-flex' : 'none';
     }
-    
-    document.getElementById('cartModal').style.display = 'none';
+
+    const msg = encodeURIComponent(
+        `Hello Hanuman Heritage, I have paid ₹${formatINR(booking.total)} for booking ${booking.id} (${booking.guestName}). Please confirm my booking.`
+    );
+    const wa = document.getElementById('whatsappConfirmBtn');
+    if (wa) wa.href = `https://wa.me/91${HOTEL_PHONE}?text=${msg}`;
+
     document.getElementById('paymentModal').style.display = 'block';
 }
 
 function printBill() {
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.18;
-    const total = subtotal + tax;
-    
+    const booking = currentBooking;
+    if (!booking) return;
+
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <html>
             <head>
-                <title>Bill - Hanuman Heritage</title>
+                <title>Booking ${booking.id} - Hanuman Heritage</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 20px; }
                     .header { text-align: center; margin-bottom: 30px; }
@@ -698,11 +716,13 @@ function printBill() {
             <body>
                 <div class="header">
                     <h1>Hanuman Heritage</h1>
-                    <p>Joythinagar Main Road, Next to Abharan Jewelers<br>Chikkamagaluru, Karnataka 577101</p>
+                    <p>Jyothinagar Main Road, Next to Abharan Jewelers<br>Chikkamagaluru, Karnataka 577101<br>Phone: ${HOTEL_PHONE}</p>
+                    <h3>Booking Request (Pending Payment Confirmation)</h3>
                 </div>
                 <div class="bill-details">
-                    <p><strong>Bill Date:</strong> ${new Date().toLocaleDateString()}</p>
-                    <p><strong>Bill Number:</strong> ${Date.now()}</p>
+                    <p><strong>Booking ID:</strong> ${booking.id}</p>
+                    <p><strong>Date:</strong> ${formatDate(booking.bookingDate)}</p>
+                    <p><strong>Guest:</strong> ${escapeHTML(booking.guestName)} | ${escapeHTML(booking.guestPhone)}</p>
                 </div>
                 <table>
                     <thead>
@@ -716,31 +736,32 @@ function printBill() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${cart.map(item => `
+                        ${booking.items.map(item => `
                             <tr>
                                 <td>${item.roomName}</td>
                                 <td>${formatDate(item.checkIn)}</td>
                                 <td>${formatDate(item.checkOut)}</td>
                                 <td>${item.nights}</td>
-                                <td>₹${item.price}</td>
-                                <td>₹${item.total}</td>
+                                <td>₹${formatINR(item.price)}</td>
+                                <td>₹${formatINR(item.total)}</td>
                             </tr>
                         `).join('')}
                         <tr>
                             <td colspan="5" style="text-align: right;"><strong>Subtotal:</strong></td>
-                            <td><strong>₹${subtotal.toFixed(2)}</strong></td>
+                            <td><strong>₹${formatINR(booking.subtotal)}</strong></td>
                         </tr>
                         <tr>
-                            <td colspan="5" style="text-align: right;"><strong>Tax (18%):</strong></td>
-                            <td><strong>₹${tax.toFixed(2)}</strong></td>
+                            <td colspan="5" style="text-align: right;"><strong>GST (${GST_RATE * 100}%):</strong></td>
+                            <td><strong>₹${formatINR(booking.tax)}</strong></td>
                         </tr>
                         <tr class="total-row">
                             <td colspan="5" style="text-align: right;"><strong>Total:</strong></td>
-                            <td><strong>₹${total.toFixed(2)}</strong></td>
+                            <td><strong>₹${formatINR(booking.total)}</strong></td>
                         </tr>
                     </tbody>
                 </table>
                 <div class="footer">
+                    <p>Your booking is confirmed once the hotel receives your payment.</p>
                     <p>Thank you for choosing Hanuman Heritage!</p>
                 </div>
             </body>
@@ -750,160 +771,15 @@ function printBill() {
     printWindow.print();
 }
 
-// Admin Panel Functions
-function openAdminPanel() {
-    document.getElementById('adminModal').style.display = 'block';
-    showTab('bookings');
-}
-
-function showTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    document.getElementById(tabName + 'Tab').classList.add('active');
-    const clickedBtn = event ? event.target : document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
-    if (clickedBtn) {
-        clickedBtn.classList.add('active');
-    }
-    
-    if (tabName === 'bookings') {
-        loadBookings();
-    } else if (tabName === 'reports') {
-        loadSalesReport();
-    }
-}
-
-function loadBookings() {
-    const bookingsList = document.getElementById('bookingsList');
-    if (!bookingsList) return;
-    
-    if (bookings.length === 0) {
-        bookingsList.innerHTML = '<p style="text-align: center; padding: 2rem;">No bookings found</p>';
-        return;
-    }
-    
-    bookingsList.innerHTML = bookings.map(booking => `
-        <div class="booking-item">
-            <div class="booking-item-info">
-                <h4>Booking #${booking.id}</h4>
-                <p>Date: ${formatDate(booking.bookingDate)}</p>
-                <p>Rooms: ${booking.items.map(item => item.roomName).join(', ')}</p>
-                <p>Check-in: ${formatDate(booking.items[0].checkIn)} | Check-out: ${formatDate(booking.items[0].checkOut)}</p>
-                <p>Total: ₹${booking.total.toFixed(2)} | Status: ${booking.status}</p>
-            </div>
-            <div class="booking-item-actions">
-                <button class="btn-edit" onclick="editBooking(${booking.id})">Edit</button>
-                <button class="btn-delete" onclick="deleteBooking(${booking.id})">Delete</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function editBooking(bookingId) {
-    const booking = bookings.find(b => b.id === bookingId);
-    if (!booking) return;
-    
-    const newStatus = prompt('Enter new status (Confirmed/Cancelled/Pending):', booking.status);
-    if (newStatus) {
-        booking.status = newStatus;
-        localStorage.setItem('bookings', JSON.stringify(bookings));
-        loadBookings();
-    }
-}
-
-function payWithUPI() {
-    const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.18;
-    const totalAmount = (subtotal + tax).toFixed(2);
-
-    const upiID = "8277373641@upi";
-    const upiName = "Hanuman Heritage";
-
-    const upiLink = `upi://pay?pa=${upiID}&pn=${encodeURIComponent(upiName)}&am=${totalAmount}&cu=INR`;
-
-    // Android intent link - fallback
-    const intentLink = `intent://pay?pa=${upiID}&pn=${encodeURIComponent(upiName)}&am=${totalAmount}&cu=INR#Intent;scheme=upi;end;`;
-
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-        // Primary attempt
-        window.location.href = upiLink;
-
-        // Fallback after delay
-        setTimeout(() => {
-            window.location.href = intentLink;
-        }, 1500);
-    } else {
-        // Desktop fallback: Show QR Modal
-        showUPIQR(totalAmount);
-        alert("Use your mobile UPI app or scan the QR code to complete payment.");
-    }
-}
-
-
-
-
-function deleteBooking(bookingId) {
-    if (confirm('Are you sure you want to delete this booking?')) {
-        bookings = bookings.filter(b => b.id !== bookingId);
-        localStorage.setItem('bookings', JSON.stringify(bookings));
-        loadBookings();
-    }
-}
-
-function loadSalesReport() {
-    const salesReport = document.getElementById('salesReport');
-    if (!salesReport) return;
-    
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const monthlyBookings = bookings.filter(booking => {
-        const bookingDate = new Date(booking.bookingDate);
-        return bookingDate.getMonth() === currentMonth && 
-               bookingDate.getFullYear() === currentYear;
-    });
-    
-    const totalRevenue = monthlyBookings.reduce((sum, booking) => sum + booking.total, 0);
-    const totalBookings = monthlyBookings.length;
-    const averageBooking = totalBookings > 0 ? totalRevenue / totalBookings : 0;
-    
-    salesReport.innerHTML = `
-        <div style="padding: 2rem;">
-            <h3 style="margin-bottom: 2rem;">Sales Report - ${now.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px;">
-                    <h4 style="color: #666; margin-bottom: 0.5rem;">Total Bookings</h4>
-                    <p style="font-size: 2rem; font-weight: bold; color: #c9a961;">${totalBookings}</p>
-                </div>
-                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px;">
-                    <h4 style="color: #666; margin-bottom: 0.5rem;">Total Revenue</h4>
-                    <p style="font-size: 2rem; font-weight: bold; color: #c9a961;">₹${totalRevenue.toFixed(2)}</p>
-                </div>
-                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px;">
-                    <h4 style="color: #666; margin-bottom: 0.5rem;">Average Booking</h4>
-                    <p style="font-size: 2rem; font-weight: bold; color: #c9a961;">₹${averageBooking.toFixed(2)}</p>
-                </div>
-            </div>
-            <h4 style="margin-bottom: 1rem;">Recent Bookings</h4>
-            <div style="max-height: 400px; overflow-y: auto;">
-                ${monthlyBookings.length > 0 ? monthlyBookings.map(booking => `
-                    <div style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem;">
-                        <strong>Booking #${booking.id}</strong> - ₹${booking.total.toFixed(2)} - ${formatDate(booking.bookingDate)}
-                    </div>
-                `).join('') : '<p>No bookings this month</p>'}
-            </div>
-        </div>
-    `;
-}
-
 // Utility Functions
+function formatINR(amount) {
+    return Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', { 
