@@ -877,3 +877,8 @@ input:focus { border-color: var(--green); outline: 2px solid rgba(30, 69, 53, 0.
 .place-photo img { height: 240px; min-height: 0; max-height: none; flex: none; }
 .place-photo { grid-row: auto; }
 .guide-pair img { height: auto; }
+.footer-credit {
+    grid-column: 1 / -1; max-width: none; margin: 0.5rem 0 0; padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,.14); opacity: 0.8; text-align: center;
+}
+.footer-credit .nowrap { white-space: nowrap; }
