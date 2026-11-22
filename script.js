@@ -18,7 +18,7 @@ const POLICIES = [
 
 // ===== Rooms =====
 // price: per room per night, GST included. guests: maximum guests per room.
-// stock: how many rooms of this type the hotel has (26 in all). The website also asks the
+// stock: how many rooms of this type the hotel has (26 in all, including the 2 suites). The website also asks the
 // booking server how many are free for the chosen dates, so rooms sold on Booking.com or
 // to walk-in guests are not sold twice.
 const rooms = [
@@ -31,9 +31,16 @@ const rooms = [
     },
     {
         id: 2, name: 'AC Room', price: 2500, guests: 2,
-        bed: 'Double bed', size: '250 sq ft', stock: 10,
-        photos: ['Delux_AC_Room', 'Premium_Suite_Room_02', 'Premium_Suite_Room_01', 'Bathroom_01'],
+        bed: 'Double bed', size: '250 sq ft', stock: 8,
+        photos: ['Delux_AC_Room', 'Bathroom_01', 'Passage_01'],
         description: 'A double room with air conditioning, for warmer days and a quieter night.',
+        features: ['Double bed', 'Air conditioning', 'TV', 'WiFi', 'Attached bathroom']
+    },
+    {
+        id: 6, name: 'Suite Room', price: 3000, guests: 2,
+        bed: 'Double bed', size: 'spacious', stock: 2,
+        photos: ['Premium_Suite_Room_01', 'Premium_Suite_Room_02', 'Heritage_Suite', 'Bathroom_01'],
+        description: 'Our two suites: more space and comfort, with air conditioning. Only two in the hotel, so book early.',
         features: ['Double bed', 'Air conditioning', 'TV', 'WiFi', 'Attached bathroom']
     },
     {
