@@ -876,3 +876,4 @@ input:focus { border-color: var(--green); outline: 2px solid rgba(30, 69, 53, 0.
 .dist { margin-top: 0; order: -1; }
 .place-photo img { height: 240px; min-height: 0; max-height: none; flex: none; }
 .place-photo { grid-row: auto; }
+.guide-pair img { height: auto; }
