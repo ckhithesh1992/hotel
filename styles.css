@@ -775,3 +775,9 @@ input:focus { border-color: var(--green); outline: 2px solid rgba(30, 69, 53, 0.
 .faq summary { cursor: pointer; font-weight: 600; }
 .faq details p { margin: 0.6rem 0 0; color: var(--muted); }
 .room-static { grid-template-columns: 1fr auto; padding-left: 1.4rem; }
+
+/* Chikmagalur guide page */
+.guide ol { padding-left: 1.3rem; max-width: 68ch; }
+.guide ol li { margin-bottom: 0.5rem; }
+.guide .price-table td { vertical-align: top; }
+.sources { font-size: var(--step--1); }
